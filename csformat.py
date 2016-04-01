@@ -5,7 +5,7 @@ from collections import OrderedDict
 class DataBlock(object):
     expanded_field = False
     name_field = None
-    block_type_field = bytes
+    block_type_field = NotImplemented
     color_space_field = NotImplemented
     colors_od = NotImplemented
     block_count = NotImplemented
@@ -20,14 +20,6 @@ class DataBlock(object):
             return 0
         else:
             return len(self.name_field)
-
-    def _pack_name_field(self)->bytes:
-        if self.name_field is None:
-            return self.n0_struct.pack(0)
-        elif isinstance(self.name_field, str) or isinstance(self.name_field, bytes):
-            return self.n1_struct.pack(len(self.name_field), self.name_field)
-        else:
-            raise NotImplementedError
 
     def unpack_name_field(self, fstream):
         name_len = self.n0_struct.unpack(fstream.peek(2)[:2])[0]
@@ -45,21 +37,31 @@ class DataBlock(object):
     def unpack_expanded_field(self, fstream):
         self.expanded_field = self.e_struct.unpack(fstream.read(1)[:1])[0]
 
-    def _pack_expanded_field(self)->bytes:
-        assert isinstance(self.expanded_field, bool)
-        return self.e_struct.pack(self.expanded_field)
-
     def unpack_block_count(self, fstream):
         raise NotImplementedError
-
-    def pack(self):
-        return NotImplemented
 
     def unpack(self, fstream, is_first=False):
         self.unpack_name_field(fstream)
         self.unpack_color_field(fstream)
+        if is_first:
+            print('hey')
         if not is_first:
             self.unpack_expanded_field(fstream)
+
+    def pack(self):
+        return NotImplemented
+
+    def _pack_expanded_field(self)->bytes:
+        assert isinstance(self.expanded_field, bool)
+        return self.e_struct.pack(self.expanded_field)
+
+    def _pack_name_field(self)->bytes:
+            if self.name_field is None:
+                return self.n0_struct.pack(0)
+            elif isinstance(self.name_field, str) or isinstance(self.name_field, bytes):
+                return self.n1_struct.pack(len(self.name_field), self.name_field)
+            else:
+                raise NotImplementedError
 
 
 class ColorBlock(DataBlock):
@@ -84,6 +86,7 @@ class ColorBlock(DataBlock):
 
 class GroupBlockStart(DataBlock):
     block_type_field = b'\x02\x00'
+    pass
 
 
 class GroupBlockEnd(DataBlock):
@@ -163,13 +166,13 @@ class CSFileReader(object):
         print(self.file.tell(), '-->loaded a ', self.blocks[-1])
 
         if rcode < 2:  # block has name
-            self.blocks[-1].unpack(self.file, len(self.blocks) == 0)
-            return True
+            self.blocks[-1].unpack(self.file, (len(self.blocks) == 1))
+        return True
 
     def read_all_blocks(self):
-        while True:
-            return self.next_block()
-
+        res = True
+        while res:
+            res = self.next_block()
 
 
     @property

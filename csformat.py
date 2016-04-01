@@ -116,7 +116,7 @@ class CSFile(object):
 
 class CSFileReader(object):
     MAGIC_NUMBER = (b'C', b'S')
-    struct_mn = struct.Struct('2s')
+    struct_mn = struct.Struct('cc')
 
     def __init__(self, fileOrStream):
         self.file = fileOrStream

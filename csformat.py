@@ -10,11 +10,9 @@ class DataBlock(object):
     colors_od = NotImplemented
     block_count = NotImplemented
 
-
     n0_struct = struct.Struct('h')
     n1_struct = struct.Struct('hs')
     e_struct = struct.Struct('?')
-
 
     @property
     def name_len_prop(self):
@@ -46,6 +44,12 @@ class DataBlock(object):
     def unpack(self, fstream):
         raise NotImplementedError
 
+    @classmethod
+    def from_unpack(cls, fstream):
+        new_cls_i = cls()
+        new_cls_i.unpack(fstream)
+        return new_cls_i
+
     def pack(self)->bytes:
         return NotImplemented
 
@@ -71,9 +75,7 @@ class ColorBlock(DataBlock):
         self.unpack_color_field(fstream)
         self.unpack_expanded_field(fstream)
 
-    def unpack_color_field(self, fstream):
-        self.color_space_field = self.n0_struct.unpack(fstream.read(2)[:2])[0]
-
+    def init_color_dict(self):
         if self.color_space_field == 1:
             self.colors_od = OrderedDict.fromkeys('rgb')
 
@@ -82,6 +84,10 @@ class ColorBlock(DataBlock):
 
         else:
             raise NotImplementedError
+
+    def unpack_color_field(self, fstream):
+        self.color_space_field = self.n0_struct.unpack(fstream.read(2)[:2])[0]
+        self.init_color_dict()
 
         for k in self.colors_od.keys():
             self.colors_od[k] = struct.unpack('f', fstream.read(4)[:4])[0]
@@ -102,8 +108,11 @@ class GroupBlockEnd(DataBlock):
     def pack(self)->bytes:
         return b'\x03\x00'
 
-    def unpack(self, fstream, is_first=False):
+    def unpack(self, fstream):
         return NotImplemented
+
+    def __bytes__(self):
+        return self.block_type_field
 
 
 class BaseColorBlock(ColorBlock):
@@ -121,6 +130,9 @@ class BlockCountBlock(DataBlock):
     def unpack_block_count(self, fstream):
         self.block_count = self.n0_struct.unpack(fstream.read(2)[:2])[0]
 
+    def __bytes__(self):
+        return self.n0_struct.pack(self.block_count)
+
 
 class MagicBlock(DataBlock):
     block_type_field = b'\x43\x53'  # str(CS)
@@ -132,16 +144,26 @@ class MagicBlock(DataBlock):
     def unpack(self, fstream):
         return NotImplemented
 
+    def __bytes__(self):
+        return self.block_type_field
+
+
+def detect_block(mn: bytes)->DataBlock:
+    if mn == b'':
+        raise EOFError
+
+    for b_cls in (ColorBlock, GroupBlockStart, GroupBlockEnd, MagicBlock):
+        if b_cls.block_type_field == mn:
+            return b_cls
+    raise NotImplementedError
+
 
 class CSFile(object):
     def __init__(self):
-        self.magic_blocks = (MagicBlock(), ColorBlock(), BlockCountBlock())
+        self.magic_blocks = (MagicBlock(), BaseColorBlock(), BlockCountBlock())
 
 
 class CSFileReader(object):
-    MAGIC_NUMBER = (b'C', b'S')
-    struct_mn = struct.Struct('cc')
-
     def __init__(self, fileOrStream):
         self.file = fileOrStream
         self.blocks = []
@@ -158,48 +180,28 @@ class CSFileReader(object):
         return pos
 
     def _load_block(self)->int:
-        #print(self.file.tell(), self.file.peek(2)[:2])
-
-        if len(self.blocks) == 1:
-            self.blocks.append(BlockCountBlock())
-            self.blocks[-1].unpack_block_count(self.file)
-            return 3
-
         btype = self.file.read(2)[:2]
-        if btype == b'':
+        try:
+            self.blocks.append(detect_block(btype).from_unpack(self.file))
+            print(self.file.tell(), '-->loaded a ', self.blocks[-1])
+            return 0
+        except EOFError:
             return -1
-
-        for i, cls_n in enumerate((ColorBlock, GroupBlockStart, GroupBlockEnd)):
-            if btype == cls_n.block_type_field:
-                self.blocks.append(cls_n())
-                return i
-
-        if __debug__:
-            ss = self.file.tell()
-            raise NotImplementedError(str(ss) + '-->Unknown block type:  ' + str(struct.unpack('h', btype)) + ':raw ' + str(btype))
-        else:
-            return -1
+        except NotImplementedError:
+            raise NotImplementedError('{}-->Unknown block type:  {}:raw {}'.format(
+                self.file.tell(), struct.unpack('h', btype), btype))
 
     def _load_magic_blocks(self):
         assert len(self.blocks) == 0
         assert self.file.tell() == 0
         for cls_n in (MagicBlock, BaseColorBlock, BlockCountBlock):
-            new_mb = cls_n()
-            if new_mb.block_type_field is not NotImplemented:
-                assert self.file.read(2)[:2] == new_mb.block_type_field
-            new_mb.unpack(self.file)
-            self.blocks.append(new_mb)
+            btf = cls_n.block_type_field
+            assert btf == NotImplemented or btf == self.file.read(2)[:2]
+
+            self.blocks.append(cls_n.from_unpack(self.file))
 
     def next_block(self):
-        rcode = self._load_block()
-        if rcode == -1:
-            return False
-
-        print(self.file.tell(), '-->loaded a ', self.blocks[-1])
-
-        if rcode < 2:  # block has name
-            self.blocks[-1].unpack(self.file)
-        return True
+        return self._load_block() != -1
 
     def read_all_blocks(self):
         res = True

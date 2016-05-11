@@ -1,5 +1,9 @@
 import struct
 from collections import OrderedDict
+import typing
+import exporters
+
+WeakBool = typing.Union[bool, type(NotImplemented)]
 
 
 class DataBlock(object):
@@ -229,33 +233,51 @@ class CSColor(object):
     def name_str_len(self):
         return len(self.name_str)
 
-with open("color_xml_test_data.cs", 'rb') as cs_fd:
-    csf = CSFileReader(cs_fd)
-    csf.read_all_blocks()
-    print(csf.blocks)
-    print(csf.tail_block_type)
+if __name__ == '__main__':
+    with open("color_xml_test_data.cs", 'rb') as cs_fd:
+        csf1 = CSFileReader(cs_fd)
+        csf1.read_all_blocks()
+        print(csf1.blocks)
+        print(csf1.tail_block_type)
+        ps = exporters.PaletteShowcase.from_csfile(csf1)
+        ps.write_to_file("color_xml_test_data.html")
 
-exit()
+    with open("blackboard.cs", 'rb') as cs_fd:
+        csf1 = CSFileReader(cs_fd)
+        csf1.read_all_blocks()
+        print(csf1.blocks)
+        print(csf1.tail_block_type)
+        ps = exporters.PaletteShowcase.from_csfile(csf1)
+        ps.write_to_file("blackboard.html")
 
-with open("color_xml_test_data.cs", 'rb') as cs_fd:
-    print(b''.join(struct.unpack('cc', cs_fd.read(2))).decode('utf-8'))
-    block_type = struct.unpack('h', cs_fd.read(2))[0]
-    print(block_type)
-    name_str_len = struct.unpack('h', cs_fd.read(2))[0]
-    print(name_str_len)
-    if name_str_len > 0:
-        name_str_str = struct.unpack('s', cs_fd.read(name_str_len))
-        print(name_str_str)
-    color_space = struct.unpack('h', cs_fd.read(2))[0]
-    print(color_space)
-    if color_space != 1:  # RGB
-        raise NotImplementedError
+    with open("Triads2.cs", 'rb') as cs_fd:
+        csf1 = CSFileReader(cs_fd)
+        csf1.read_all_blocks()
+        print(csf1.blocks)
+        print(csf1.tail_block_type)
+        exporters.PaletteShowcase.from_csfile(csf1).write_to_file("Triads2.html")
 
-    r, g, b = struct.unpack('fff', cs_fd.read(12))
-    print(r, g, b)
+    exit()
 
-    expanded = struct.unpack('?', cs_fd.read(1))[0]
-    print(expanded)
+    with open("color_xml_test_data.cs", 'rb') as cs_fd:
+        print(b''.join(struct.unpack('cc', cs_fd.read(2))).decode('utf-8'))
+        block_type = struct.unpack('h', cs_fd.read(2))[0]
+        print(block_type)
+        name_str_len = struct.unpack('h', cs_fd.read(2))[0]
+        print(name_str_len)
+        if name_str_len > 0:
+            name_str_str = struct.unpack('s', cs_fd.read(name_str_len))
+            print(name_str_str)
+        color_space = struct.unpack('h', cs_fd.read(2))[0]
+        print(color_space)
+        if color_space != 1:  # RGB
+            raise NotImplementedError
+
+        r, g, b = struct.unpack('fff', cs_fd.read(12))
+        print(r, g, b)
+
+        expanded = struct.unpack('?', cs_fd.read(1))[0]
+        print(expanded)
 
 
 

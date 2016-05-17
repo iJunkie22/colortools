@@ -1,0 +1,14 @@
+GIMP Palette
+Name: blackboard
+Columns: 10
+#
+255 100 0	entity
+251 222 45	keyword
+216 250 60	constant
+174 174 174	comment
+251 222 45	storage
+97 206 60	string, meta.verbatim
+141 166 206	support
+127 144 170	meta.tag, meta.tag entity
+255 255 255	entity.name.section
+

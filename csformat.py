@@ -237,25 +237,20 @@ if __name__ == '__main__':
     with open("color_xml_test_data.cs", 'rb') as cs_fd:
         csf1 = CSFileReader(cs_fd)
         csf1.read_all_blocks()
-        print(csf1.blocks)
-        print(csf1.tail_block_type)
-        ps = exporters.PaletteShowcase.from_csfile(csf1)
-        ps.write_to_file("color_xml_test_data.html")
+        exporters.PaletteShowcase.from_csfile(csf1).write_to_file("color_xml_test_data.html")
+        exporters.GimpPalette.from_csfile(csf1).write_to_file("color_xml_test_data.gpl")
 
     with open("blackboard.cs", 'rb') as cs_fd:
         csf1 = CSFileReader(cs_fd)
         csf1.read_all_blocks()
-        print(csf1.blocks)
-        print(csf1.tail_block_type)
-        ps = exporters.PaletteShowcase.from_csfile(csf1)
-        ps.write_to_file("blackboard.html")
+        exporters.PaletteShowcase.from_csfile(csf1).write_to_file("blackboard.html")
+        exporters.GimpPalette.from_csfile(csf1).write_to_file("blackboard.gpl")
 
     with open("Triads2.cs", 'rb') as cs_fd:
         csf1 = CSFileReader(cs_fd)
         csf1.read_all_blocks()
-        print(csf1.blocks)
-        print(csf1.tail_block_type)
         exporters.PaletteShowcase.from_csfile(csf1).write_to_file("Triads2.html")
+        exporters.GimpPalette.from_csfile(csf1).write_to_file("Triads2.gpl")
 
     exit()
 

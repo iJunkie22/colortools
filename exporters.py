@@ -87,86 +87,6 @@ class HtmlTree(object):
         self.html_page.close()
 
 
-def get_image_info(fname):
-    """
-    kudos to http://stackoverflow.com/questions/8032642/how-to-obtain-image-size-using-standard-python-class-without-using-external-lib
-    """
-    if fname.rpartition('.')[2] == 'png':
-        with open(fname, 'rb') as fd_img:
-            data = fd_img.read(30)
-            w, h = struct.unpack('>LL', data[16:24])
-            width = int(w)
-            height = int(h)
-    else:
-        raise Exception('not a png image')
-    return width, height
-
-
-class ImageShowcase(object):
-    def __init__(self):
-        self.ht = HtmlTree()
-        self.ht.add_style('html,body{background-color:#222;color:#EEE;font-family:sans-serif;}')
-        self.ht.add_style('.shelf, .shelf2{margin:10px;display:inline-block;min-width:300px;min-height:100px;}')
-        self.ht.add_style('.shelf{background-color:#333;}')
-        self.ht.add_style('.shelf2{background-color:#BBB;color:#222}')
-        self.ht.add_style('.dimension{color:#555;}')
-        self.ht.add_style('.shelf>*,.shelf2>*{display:block;margin:0 auto;text-align:center;}')
-
-    def add_img_png(self, img_fname):
-        shelf_el = ET.Element('div', {'class': 'shelf'})
-        img_el = ET.Element('img', {'src': 'file://' + img_fname})
-        shelf_el.append(img_el)
-        #shelf_el.append(ET.Element('br'))
-        span_el_fn = ET.Element('span')
-        span_el_fn.text = img_fname.rpartition('/')[2]
-        span_el_dim = ET.Element('span', {'class': 'dimension'})
-        span_el_dim.text = '{} x {}'.format(*get_image_info(img_fname))
-        shelf_el.append(span_el_dim)
-        shelf_el.append(ET.Element('br'))
-        shelf_el.append(span_el_fn)
-        self.ht.body.append(shelf_el)
-
-    def add_img_jpg(self, img_fname):
-        shelf_el = ET.Element('div', {'class': 'shelf'})
-        img_el = ET.Element('img', {'src': 'file://' + img_fname})
-        shelf_el.append(img_el)
-        # shelf_el.append(ET.Element('br'))
-        span_el_fn = ET.Element('span')
-        span_el_fn.text = img_fname.rpartition('/')[2]
-        span_el_dim = ET.Element('span', {'class': 'dimension'})
-        # span_el_dim.text = '{} x {}'.format(*get_image_info(img_fname))
-        span_el_dim.text = '? x ?'
-        shelf_el.append(span_el_dim)
-        shelf_el.append(ET.Element('br'))
-        shelf_el.append(span_el_fn)
-        self.ht.body.append(shelf_el)
-
-    def write_to_file(self, fname):
-        with open(fname, 'w') as fd1:
-            fd1.write(self.ht.dump())
-        return fname
-
-
-def build_showcase(dpath):
-    sc = ImageShowcase()
-    full_path = os.path.abspath(dpath)
-    glob_pat = os.path.join(full_path, '*.png')
-    glob_pat2 = os.path.join(full_path, '*.jpg')
-    glob_pat3 = os.path.join(full_path, '*.jpeg')
-    ofilename = os.path.join(full_path, 'showcase.html')
-    for img_fn in sorted(glob.glob(glob_pat)):
-        sc.add_img_png(img_fn)
-    for img_fn in sorted([*glob.glob(glob_pat2), *glob.glob(glob_pat3)]):
-        sc.add_img_jpg(img_fn)
-    for shelf in [i for i in sc.ht.body]:
-        shelf2 = ET.fromstring(ET.tostring(shelf))
-        assert isinstance(shelf2, ET.Element)
-        shelf2.attrib['class'] = 'shelf2'
-        sc.ht.body.append(shelf2)
-
-    return sc.write_to_file(ofilename)
-
-
 class PaletteShowcase(object):
     def __init__(self):
         self.cb_count = 0
@@ -212,6 +132,47 @@ class PaletteShowcase(object):
 
         return new_ps
 
+
+def bfloat_to_sint(bf):
+    # s1 = str(bf, encoding='ascii')
+    f1 = float(bf)
+    return int(f1 * 255)
+
+
+class GimpPalette(object):
+    def __init__(self):
+        self.color_lines = []
+        self.palette_name = ""
+
+    @staticmethod
+    def color_line(r, g, b, name=None):
+        cname = str(name, encoding='ascii') if name else "Untitled"
+        r2, g2, b2 = [bfloat_to_sint(x) for x in (r, g, b)]
+        return "{} {} {}\t{}".format(r2, g2, b2, cname)
+
+    def write_color_line(self, cb:csformat.ColorBlock):
+        self.color_lines.append(self.color_line(name=cb.name_field, **cb.colors_od))
+
+    def write_to_file(self, fname):
+        with open(fname, 'w') as fd1:
+            fd1.write("GIMP Palette\nName: ")
+            fd1.write(str(fname).rpartition('.')[0])
+            fd1.write("\nColumns: 10\n#\n")
+            for cl in self.color_lines:
+                fd1.write(cl)
+                fd1.write("\n")
+            fd1.write("\n")
+        return fname
+
+    @classmethod
+    def from_csfile(cls, csf:csformat.CSFileReader):
+        new_gp = cls()
+        for anyb in csf.blocks:
+            if anyb.__class__.__name__ == 'ColorBlock':
+                new_gp.write_color_line(anyb)
+            else:
+                print("skipping", anyb, anyb.__class__.__name__)
+        return new_gp
 
 
 
